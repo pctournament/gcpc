@@ -326,7 +326,6 @@ footer a{
 color:#cfe3e8;
 }
 
-/* --- Highlights grid --- */
 .highlight-heading{
   font-size:28px;
   font-weight:700;
@@ -365,6 +364,155 @@ color:#cfe3e8;
   display:block;
   background:#000;
   border:1px solid #283f47;
+}
+
+.discord-card{
+  overflow:hidden;
+  padding:0;
+}
+
+.discord-banner{
+  width:100%;
+  aspect-ratio:16/5;
+  background:#0e2429 url('') center/cover no-repeat;
+  background-size:cover;
+  position:relative;
+  display:flex;
+  align-items:flex-end;
+}
+
+.discord-banner.no-banner{
+  background:linear-gradient(135deg,#16414d,#0e2429);
+}
+
+.discord-body{
+  padding:30px 35px 35px 35px;
+  display:flex;
+  flex-wrap:wrap;
+  align-items:center;
+  gap:28px;
+  justify-content:space-between;
+}
+
+.discord-identity{
+  display:flex;
+  align-items:center;
+  gap:18px;
+}
+
+.discord-icon{
+  width:76px;
+  height:76px;
+  border-radius:24px;
+  object-fit:cover;
+  background:#16323a;
+  box-shadow:0 0 0 4px #092730, 0 0 24px rgba(40,63,71,.6);
+  flex-shrink:0;
+}
+
+.discord-name{
+  font-size:24px;
+  font-weight:800;
+  color:#fff;
+}
+
+.discord-counts{
+  margin-top:8px;
+  display:flex;
+  gap:18px;
+  flex-wrap:wrap;
+}
+
+.discord-count{
+  display:flex;
+  align-items:center;
+  gap:7px;
+  font-size:14px;
+  color:#c3d3d7;
+}
+
+.discord-count .dot{
+  width:10px;
+  height:10px;
+  border-radius:50%;
+  display:inline-block;
+}
+
+.discord-count .dot.online{ background:#3ba55d; }
+.discord-count .dot.total{ background:#5c7178; }
+
+.discord-join-btn{
+  display:inline-flex;
+  align-items:center;
+  gap:10px;
+  padding:14px 26px;
+  background:#5865F2;
+  color:#fff;
+  font-weight:700;
+  font-size:15px;
+  border-radius:12px;
+  text-decoration:none;
+  transition:background .2s, transform .15s;
+  white-space:nowrap;
+}
+
+.discord-join-btn:hover{
+  background:#6a75f5;
+  transform:translateY(-2px);
+}
+
+.discord-members-heading{
+  padding:0 35px;
+  font-size:13px;
+  text-transform:uppercase;
+  letter-spacing:1px;
+  color:#8ba7ae;
+  margin-bottom:14px;
+}
+
+.discord-members{
+  padding:0 35px 35px 35px;
+  display:grid;
+  grid-template-columns:repeat(auto-fill, minmax(140px, 1fr));
+  gap:14px;
+}
+
+.discord-member{
+  display:flex;
+  align-items:center;
+  gap:10px;
+  background:#0e2429;
+  border:1px solid #23404a;
+  border-radius:12px;
+  padding:8px 10px;
+}
+
+.discord-member .avatar-wrapper{
+  width:34px;
+  height:34px;
+  margin-bottom:0;
+}
+
+.discord-member .status-dot{
+  width:12px;
+  height:12px;
+  border-width:2px;
+}
+
+.discord-member-name{
+  font-size:13px;
+  color:#eef6f8;
+  font-weight:600;
+  white-space:nowrap;
+  overflow:hidden;
+  text-overflow:ellipsis;
+}
+
+.discord-loading, .discord-error{
+  padding:35px;
+  text-align:center;
+  color:#8ba7ae;
+  font-size:14px;
 }
 
 </style>
@@ -647,6 +795,14 @@ color:#cfe3e8;
   </div>
 </div>
 
+<div class="section" id="discord-section">
+  <h2 class="title">Our Discord 💬</h2>
+
+  <div class="card discord-card" id="discord-card">
+    <div class="discord-loading" id="discord-loading">Loading server info…</div>
+  </div>
+</div>
+
 <script>
 
 const cards = document.querySelectorAll(".card");
@@ -721,6 +877,7 @@ document.addEventListener("DOMContentLoaded", () => {
 runCounters();
 animated = true;
 loadLanyardUsers();
+loadDiscordServer();
 });
 
 function loadLanyardUsers(){
@@ -773,6 +930,91 @@ el.innerText = activity;
 })
 .catch(err => console.error("Lanyard API Error:", id, err));
 });
+}
+
+const DISCORD_GUILD_ID = "1504067785725317234";
+const DISCORD_INVITE_URL = "https://discord.gg/JJfk7z9gdJ";
+const DISCORD_INVITE_CODE = "JJfk7z9gdJ";
+
+function loadDiscordServer(){
+  const container = document.getElementById('discord-card');
+
+  const widgetPromise = fetch(`https://discord.com/api/guilds/${DISCORD_GUILD_ID}/widget.json`)
+    .then(r => { if(!r.ok) throw new Error('widget unavailable'); return r.json(); });
+
+  const invitePromise = fetch(`https://discord.com/api/v10/invites/${DISCORD_INVITE_CODE}?with_counts=true&with_expiration=true`)
+    .then(r => { if(!r.ok) throw new Error('invite unavailable'); return r.json(); });
+
+  Promise.allSettled([widgetPromise, invitePromise]).then(([widgetResult, inviteResult]) => {
+
+    const widget = widgetResult.status === 'fulfilled' ? widgetResult.value : null;
+    const invite = inviteResult.status === 'fulfilled' ? inviteResult.value : null;
+
+    if(!widget && !invite){
+      container.innerHTML = `<div class="discord-error">
+        Couldn't load live Discord stats right now — but you can still hop in!
+        <br><br>
+        <a class="discord-join-btn" href="${DISCORD_INVITE_URL}" target="_blank" rel="noopener">
+          Join Discord
+        </a>
+      </div>`;
+      return;
+    }
+
+    const guild = invite ? invite.guild : null;
+    const guildName = (widget && widget.name) || (guild && guild.name) || "Our Discord Server";
+
+    const iconUrl = guild && guild.icon
+      ? `https://cdn.discordapp.com/icons/${guild.id}/${guild.icon}.png?size=256`
+      : null;
+
+    const bannerUrl = guild && guild.banner
+      ? `https://cdn.discordapp.com/banners/${guild.id}/${guild.banner}.png?size=1024`
+      : null;
+
+    const onlineCount = (widget && widget.presence_count) || (invite && invite.approximate_presence_count) || 0;
+    const totalCount = (invite && invite.approximate_member_count) || null;
+
+    const onlineMembers = (widget && widget.members) ? widget.members : [];
+
+    const membersHtml = onlineMembers.length > 0
+      ? onlineMembers.slice(0, 40).map(m => {
+          const avatar = m.avatar_url || 'https://cdn.discordapp.com/embed/avatars/0.png';
+          const status = m.status || 'online';
+          const name = m.username || 'Member';
+          return `<div class="discord-member">
+            <div class="avatar-wrapper">
+              <img src="${avatar}" alt="${name} avatar">
+              <div class="status-dot ${status}"></div>
+            </div>
+            <div class="discord-member-name">${name}</div>
+          </div>`;
+        }).join('')
+      : '';
+
+    container.innerHTML = `
+      <div class="discord-banner ${bannerUrl ? '' : 'no-banner'}" ${bannerUrl ? `style="background-image:url('${bannerUrl}')"` : ''}></div>
+      <div class="discord-body">
+        <div class="discord-identity">
+          ${iconUrl ? `<img class="discord-icon" src="${iconUrl}" alt="${guildName} icon">` : ''}
+          <div>
+            <div class="discord-name">${guildName}</div>
+            <div class="discord-counts">
+              <div class="discord-count"><span class="dot online"></span>${onlineCount.toLocaleString()} Online</div>
+              ${totalCount ? `<div class="discord-count"><span class="dot total"></span>${totalCount.toLocaleString()} Members</div>` : ''}
+            </div>
+          </div>
+        </div>
+        <a class="discord-join-btn" href="${DISCORD_INVITE_URL}" target="_blank" rel="noopener">
+          Join Discord
+        </a>
+      </div>
+      ${membersHtml ? `
+        <div class="discord-members-heading">Online Now</div>
+        <div class="discord-members">${membersHtml}</div>
+      ` : ''}
+    `;
+  });
 }
 
 </script>
